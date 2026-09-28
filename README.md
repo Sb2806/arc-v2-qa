@@ -1,6 +1,6 @@
 # ARC v2 — Triple-Agent Majority-Vote Question Answering
 
-Live demo: _add your Render link here_
+Live demo: https://arc-v2-qa.onrender.com
 
 Three independent agents answer the same question (a context reader, a ReWOO tool-planner, and a
 full-context reader). A voter picks the majority answer and reports confidence
