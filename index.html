@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ARC v2 — Question Answering</title>
+<style>
+  :root {
+    --bg: #f7f7f8;
+    --card: #ffffff;
+    --border: #e2e2e6;
+    --text: #1a1a2e;
+    --muted: #6b6b76;
+    --accent: #1565c0;
+    --accent-dark: #0d47a1;
+    --high: #2e7d32;
+    --medium: #e65100;
+    --low: #b71c1c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 40px 20px;
+  }
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 1.6rem;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    color: var(--muted);
+    margin-bottom: 24px;
+    font-size: 0.95rem;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  input[type="text"], textarea, input[type="url"] {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    margin-bottom: 16px;
+    resize: vertical;
+  }
+  textarea { min-height: 100px; }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button:hover { background: var(--accent-dark); }
+  button:disabled { background: var(--border); cursor: not-allowed; }
+  .config-note {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: -8px;
+    margin-bottom: 16px;
+  }
+  .result {
+    display: none;
+  }
+  .result.visible { display: block; }
+  .answer-box {
+    background: #f0f4ff;
+    border-left: 4px solid var(--accent);
+    padding: 16px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+  }
+  .answer-box .label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .answer-box .value {
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+  .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .meta-item {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 0.85rem;
+  }
+  .meta-item .k { color: var(--muted); }
+  .meta-item .v { font-weight: 600; }
+  .confidence-HIGH { color: var(--high); }
+  .confidence-MEDIUM { color: var(--medium); }
+  .confidence-LOW { color: var(--low); }
+  .agents {
+    font-size: 0.85rem;
+  }
+  .agents div {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .agents div:last-child { border-bottom: none; }
+  .error {
+    background: #fdecea;
+    border-left: 4px solid var(--low);
+    padding: 12px 16px;
+    border-radius: 6px;
+    color: var(--low);
+    font-size: 0.9rem;
+    display: none;
+  }
+  .error.visible { display: block; }
+  .spinner {
+    display: none;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .spinner.visible { display: block; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>ARC v2 — Triple-Agent Question Answering</h1>
+  <p class="subtitle">Three independent agents answer, then a voter picks the majority. Optionally paste a document for context — leave blank to fall back to live web search.</p>
+
+  <div class="card">
+    <label for="question">Question</label>
+    <input type="text" id="question" placeholder="e.g. Who wrote Romeo and Juliet?" />
+
+    <label for="context">Context (optional — paste document text here)</label>
+    <textarea id="context" placeholder="Leave blank to let ARC v2 search the web instead"></textarea>
+
+    <button id="askBtn" onclick="askQuestion()">Ask</button>
+    <div class="spinner" id="spinner">Thinking… (first request after idle may take longer)</div>
+  </div>
+
+  <div class="error" id="errorBox"></div>
+
+  <div class="card result" id="resultCard">
+    <div class="answer-box">
+      <div class="label">Answer</div>
+      <div class="value" id="answerText"></div>
+    </div>
+
+    <div class="meta-grid">
+      <div class="meta-item">
+        <div class="k">Confidence</div>
+        <div class="v" id="confidenceText"></div>
+      </div>
+      <div class="meta-item">
+        <div class="k">Votes</div>
+        <div class="v" id="votesText"></div>
+      </div>
+      <div class="meta-item">
+        <div class="k">Latency</div>
+        <div class="v" id="latencyText"></div>
+      </div>
+      <div class="meta-item">
+        <div class="k">LLM calls / tool calls</div>
+        <div class="v" id="callsText"></div>
+      </div>
+    </div>
+
+    <div class="agents">
+      <div><strong>Agent 1 (Context Reader):</strong> <span id="a1Text"></span></div>
+      <div><strong>Agent 2 (ReWOO):</strong> <span id="a2Text"></span></div>
+      <div><strong>Agent 3 (Context Reader Full):</strong> <span id="a3Text"></span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function askQuestion() {
+  const apiUrl = '/query';
+  const question = document.getElementById('question').value.trim();
+  const context = document.getElementById('context').value.trim();
+  const btn = document.getElementById('askBtn');
+  const spinner = document.getElementById('spinner');
+  const resultCard = document.getElementById('resultCard');
+  const errorBox = document.getElementById('errorBox');
+
+  errorBox.classList.remove('visible');
+  resultCard.classList.remove('visible');
+
+  if (!apiUrl) {
+    errorBox.textContent = 'Please enter the API URL.';
+    errorBox.classList.add('visible');
+    return;
+  }
+  if (!question) {
+    errorBox.textContent = 'Please enter a question.';
+    errorBox.classList.add('visible');
+    return;
+  }
+
+  btn.disabled = true;
+  spinner.classList.add('visible');
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: question, context: context })
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Server returned ${response.status}: ${text.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+
+    document.getElementById('answerText').textContent = data.answer || '(no answer)';
+    document.getElementById('confidenceText').textContent = data.confidence || '—';
+    document.getElementById('confidenceText').className = 'v confidence-' + (data.confidence || '');
+    document.getElementById('votesText').textContent = data.votes || '—';
+    document.getElementById('latencyText').textContent = (data.latency_sec ?? '—') + 's';
+    document.getElementById('callsText').textContent = `${data.llm_calls ?? '—'} / ${data.tool_calls ?? '—'}`;
+    document.getElementById('a1Text').textContent = data.agent_1_answer || '—';
+    document.getElementById('a2Text').textContent = data.agent_2_answer || '—';
+    document.getElementById('a3Text').textContent = data.agent_3_answer || '—';
+
+    resultCard.classList.add('visible');
+  } catch (err) {
+    errorBox.textContent = 'Request failed: ' + err.message +
+      '\n\nCheck that: (1) your Kaggle notebook is still running, (2) the ngrok tunnel is still active, (3) the API URL above matches the current ngrok URL.';
+    errorBox.classList.add('visible');
+  } finally {
+    btn.disabled = false;
+    spinner.classList.remove('visible');
+  }
+}
+
+document.getElementById('question').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') askQuestion();
+});
+</script>
+</body>
+</html>
